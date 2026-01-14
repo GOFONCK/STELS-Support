@@ -110,3 +110,161 @@
 2026-01-13 13:53:21 | INFO | modules.bot:request_manager:542 | Notification sent to staff 8035667634 for chat 5
 2026-01-13 13:58:20 | INFO | modules.bot:request_manager:542 | Notification sent to staff 8035667634 for chat 4
 2026-01-13 14:03:48 | INFO | modules.bot:start_command:100 | Created new chat for user 705867842
+2026-01-13 17:52:49 | INFO | modules.bot:start_command:100 | Created new chat for user 728763367
+2026-01-13 17:53:22 | INFO | __main__:main:45 | Database initialized
+2026-01-13 17:53:23 | INFO | modules.bot:initialize:44 | Bot handlers registered
+2026-01-13 17:53:23 | INFO | __main__:main:50 | Bot initialized
+2026-01-13 17:53:23 | INFO | __main__:main:53 | Starting STELS-Support bot...
+2026-01-13 17:53:23 | INFO | modules.bot:start:48 | Bot started polling
+2026-01-13 17:54:22 | INFO | __main__:main:45 | Database initialized
+2026-01-13 17:54:22 | INFO | modules.bot:initialize:45 | Bot handlers registered
+2026-01-13 17:54:22 | INFO | __main__:main:50 | Bot initialized
+2026-01-13 17:54:22 | INFO | __main__:main:53 | Starting STELS-Support bot...
+2026-01-13 17:54:22 | INFO | modules.bot:start:49 | Bot started polling
+2026-01-13 17:54:58 | INFO | modules.bot:start_command:101 | Created new chat for user 1624486289
+2026-01-13 17:55:43 | INFO | modules.bot:start_command:101 | Created new chat for user 750896997
+2026-01-13 17:56:15 | INFO | modules.bot:start_command:101 | Created new chat for user 447355632
+2026-01-13 18:01:03 | INFO | __main__:main:45 | Database initialized
+2026-01-13 18:01:03 | INFO | modules.bot:initialize:45 | Bot handlers registered
+2026-01-13 18:01:03 | INFO | __main__:main:50 | Bot initialized
+2026-01-13 18:01:03 | INFO | __main__:main:53 | Starting STELS-Support bot...
+2026-01-13 18:01:03 | INFO | modules.bot:start:49 | Bot started polling
+2026-01-13 18:03:10 | INFO | __main__:main:45 | Database initialized
+2026-01-13 18:03:10 | INFO | modules.bot:initialize:45 | Bot handlers registered
+2026-01-13 18:03:10 | INFO | __main__:main:50 | Bot initialized
+2026-01-13 18:03:10 | INFO | __main__:main:53 | Starting STELS-Support bot...
+2026-01-13 18:03:10 | INFO | modules.bot:start:49 | Bot started polling
+2026-01-13 18:04:20 | INFO | __main__:main:45 | Database initialized
+2026-01-13 18:04:20 | INFO | modules.bot:initialize:45 | Bot handlers registered
+2026-01-13 18:04:20 | INFO | __main__:main:50 | Bot initialized
+2026-01-13 18:04:20 | INFO | __main__:main:53 | Starting STELS-Support bot...
+2026-01-13 18:04:20 | INFO | modules.bot:start:49 | Bot started polling
+2026-01-13 18:08:06 | INFO | __main__:main:45 | Database initialized
+2026-01-13 18:08:06 | INFO | modules.bot:initialize:45 | Bot handlers registered
+2026-01-13 18:08:06 | INFO | __main__:main:50 | Bot initialized
+2026-01-13 18:08:06 | INFO | __main__:main:53 | Starting STELS-Support bot...
+2026-01-13 18:08:06 | INFO | modules.bot:start:49 | Bot started polling
+2026-01-13 18:08:16 | INFO | modules.bot:start_command:101 | Created new chat for user 170563895
+2026-01-13 18:08:21 | INFO | modules.bot:start_command:101 | Created new chat for user 274829941
+2026-01-13 18:08:34 | INFO | modules.bot:request_manager:675 | Notification sent to staff 8035667634 for chat 12
+2026-01-13 18:08:48 | INFO | __main__:main:45 | Database initialized
+2026-01-13 18:08:49 | INFO | modules.bot:initialize:45 | Bot handlers registered
+2026-01-13 18:08:49 | INFO | __main__:main:50 | Bot initialized
+2026-01-13 18:08:49 | INFO | __main__:main:53 | Starting STELS-Support bot...
+2026-01-13 18:08:49 | INFO | modules.bot:start:49 | Bot started polling
+2026-01-13 18:08:53 | INFO | modules.bot:request_manager:675 | Notification sent to staff 8035667634 for chat 11
+2026-01-13 18:09:18 | INFO | __main__:main:45 | Database initialized
+2026-01-13 18:09:19 | INFO | modules.bot:initialize:45 | Bot handlers registered
+2026-01-13 18:09:19 | INFO | __main__:main:50 | Bot initialized
+2026-01-13 18:09:19 | INFO | __main__:main:53 | Starting STELS-Support bot...
+2026-01-13 18:09:19 | INFO | modules.bot:start:49 | Bot started polling
+2026-01-13 18:09:55 | INFO | __main__:main:45 | Database initialized
+2026-01-13 18:09:55 | INFO | modules.bot:initialize:45 | Bot handlers registered
+2026-01-13 18:09:55 | INFO | __main__:main:50 | Bot initialized
+2026-01-13 18:09:55 | INFO | __main__:main:53 | Starting STELS-Support bot...
+2026-01-13 18:09:55 | INFO | modules.bot:start:49 | Bot started polling
+2026-01-13 18:12:04 | INFO | __main__:main:45 | Database initialized
+2026-01-13 18:12:04 | INFO | modules.bot:initialize:45 | Bot handlers registered
+2026-01-13 18:12:04 | INFO | __main__:main:50 | Bot initialized
+2026-01-13 18:12:04 | INFO | __main__:main:53 | Starting STELS-Support bot...
+2026-01-13 18:12:04 | INFO | modules.bot:start:49 | Bot started polling
+2026-01-13 18:12:22 | INFO | modules.bot:start_command:101 | Created new chat for user 274829941
+2026-01-13 18:16:38 | INFO | __main__:main:45 | Database initialized
+2026-01-13 18:16:38 | INFO | modules.bot:initialize:45 | Bot handlers registered
+2026-01-13 18:16:38 | INFO | __main__:main:50 | Bot initialized
+2026-01-13 18:16:38 | INFO | __main__:main:53 | Starting STELS-Support bot...
+2026-01-13 18:16:38 | INFO | modules.bot:start:49 | Bot started polling
+2026-01-13 18:17:05 | INFO | modules.bot:start_command:101 | Created new chat for user 274829941
+2026-01-13 18:17:24 | INFO | __main__:main:45 | Database initialized
+2026-01-13 18:17:24 | INFO | modules.bot:initialize:45 | Bot handlers registered
+2026-01-13 18:17:24 | INFO | __main__:main:50 | Bot initialized
+2026-01-13 18:17:24 | INFO | __main__:main:53 | Starting STELS-Support bot...
+2026-01-13 18:17:24 | INFO | modules.bot:start:49 | Bot started polling
+2026-01-13 18:17:57 | INFO | __main__:main:45 | Database initialized
+2026-01-13 18:17:57 | INFO | modules.bot:initialize:45 | Bot handlers registered
+2026-01-13 18:17:57 | INFO | __main__:main:50 | Bot initialized
+2026-01-13 18:17:57 | INFO | __main__:main:53 | Starting STELS-Support bot...
+2026-01-13 18:17:57 | INFO | modules.bot:start:49 | Bot started polling
+2026-01-13 18:21:28 | INFO | modules.bot:start_command:101 | Created new chat for user 138337126
+2026-01-13 18:21:40 | INFO | modules.bot:request_manager:727 | Notification sent to staff 8035667634 for chat 15
+2026-01-13 18:34:09 | INFO | modules.bot:start_command:101 | Created new chat for user 1012811842
+2026-01-13 18:36:17 | INFO | modules.bot:request_manager:727 | Notification sent to staff 8035667634 for chat 9
+2026-01-13 18:39:12 | INFO | __main__:main:45 | Database initialized
+2026-01-13 18:39:12 | INFO | modules.bot:initialize:45 | Bot handlers registered
+2026-01-13 18:39:12 | INFO | __main__:main:50 | Bot initialized
+2026-01-13 18:39:12 | INFO | __main__:main:53 | Starting STELS-Support bot...
+2026-01-13 18:39:12 | INFO | modules.bot:start:49 | Bot started polling
+2026-01-13 18:41:27 | INFO | __main__:main:45 | Database initialized
+2026-01-13 18:41:27 | INFO | modules.bot:initialize:45 | Bot handlers registered
+2026-01-13 18:41:27 | INFO | __main__:main:50 | Bot initialized
+2026-01-13 18:41:27 | INFO | __main__:main:53 | Starting STELS-Support bot...
+2026-01-13 18:41:27 | INFO | modules.bot:start:49 | Bot started polling
+2026-01-13 18:44:07 | INFO | __main__:main:45 | Database initialized
+2026-01-13 18:44:07 | INFO | modules.bot:initialize:45 | Bot handlers registered
+2026-01-13 18:44:07 | INFO | __main__:main:50 | Bot initialized
+2026-01-13 18:44:07 | INFO | __main__:main:53 | Starting STELS-Support bot...
+2026-01-13 18:44:07 | INFO | modules.bot:start:49 | Bot started polling
+2026-01-13 18:44:32 | INFO | __main__:main:45 | Database initialized
+2026-01-13 18:44:32 | INFO | modules.bot:initialize:45 | Bot handlers registered
+2026-01-13 18:44:32 | INFO | __main__:main:50 | Bot initialized
+2026-01-13 18:44:32 | INFO | __main__:main:53 | Starting STELS-Support bot...
+2026-01-13 18:44:32 | INFO | modules.bot:start:49 | Bot started polling
+2026-01-13 18:47:21 | INFO | __main__:main:45 | Database initialized
+2026-01-13 18:47:21 | INFO | modules.bot:initialize:45 | Bot handlers registered
+2026-01-13 18:47:21 | INFO | __main__:main:50 | Bot initialized
+2026-01-13 18:47:21 | INFO | __main__:main:53 | Starting STELS-Support bot...
+2026-01-13 18:47:21 | INFO | modules.bot:start:49 | Bot started polling
+2026-01-13 18:48:14 | INFO | __main__:main:45 | Database initialized
+2026-01-13 18:48:14 | INFO | modules.bot:initialize:45 | Bot handlers registered
+2026-01-13 18:48:14 | INFO | __main__:main:50 | Bot initialized
+2026-01-13 18:48:14 | INFO | __main__:main:53 | Starting STELS-Support bot...
+2026-01-13 18:48:14 | INFO | modules.bot:start:49 | Bot started polling
+2026-01-13 18:49:12 | INFO | __main__:main:45 | Database initialized
+2026-01-13 18:49:12 | INFO | modules.bot:initialize:45 | Bot handlers registered
+2026-01-13 18:49:12 | INFO | __main__:main:50 | Bot initialized
+2026-01-13 18:49:12 | INFO | __main__:main:53 | Starting STELS-Support bot...
+2026-01-13 18:49:12 | INFO | modules.bot:start:49 | Bot started polling
+2026-01-13 18:49:59 | INFO | __main__:main:45 | Database initialized
+2026-01-13 18:49:59 | INFO | modules.bot:initialize:45 | Bot handlers registered
+2026-01-13 18:49:59 | INFO | __main__:main:50 | Bot initialized
+2026-01-13 18:49:59 | INFO | __main__:main:53 | Starting STELS-Support bot...
+2026-01-13 18:49:59 | INFO | modules.bot:start:49 | Bot started polling
+2026-01-13 18:50:45 | INFO | __main__:main:45 | Database initialized
+2026-01-13 18:50:45 | INFO | modules.bot:initialize:45 | Bot handlers registered
+2026-01-13 18:50:45 | INFO | __main__:main:50 | Bot initialized
+2026-01-13 18:50:45 | INFO | __main__:main:53 | Starting STELS-Support bot...
+2026-01-13 18:50:45 | INFO | modules.bot:start:49 | Bot started polling
+2026-01-13 18:51:22 | INFO | modules.bot:start_command:101 | Created new chat for user 766310338
+2026-01-13 18:52:51 | INFO | __main__:main:45 | Database initialized
+2026-01-13 18:52:51 | INFO | modules.bot:initialize:45 | Bot handlers registered
+2026-01-13 18:52:51 | INFO | __main__:main:50 | Bot initialized
+2026-01-13 18:52:51 | INFO | __main__:main:53 | Starting STELS-Support bot...
+2026-01-13 18:52:51 | INFO | modules.bot:start:49 | Bot started polling
+2026-01-13 18:57:33 | INFO | __main__:main:45 | Database initialized
+2026-01-13 18:57:33 | INFO | modules.bot:initialize:45 | Bot handlers registered
+2026-01-13 18:57:33 | INFO | __main__:main:50 | Bot initialized
+2026-01-13 18:57:33 | INFO | __main__:main:53 | Starting STELS-Support bot...
+2026-01-13 18:57:33 | INFO | modules.bot:start:49 | Bot started polling
+2026-01-13 19:01:50 | INFO | modules.bot:start_command:101 | Created new chat for user 506205358
+2026-01-13 19:10:38 | INFO | modules.bot:start_command:101 | Created new chat for user 1250375293
+2026-01-13 19:31:43 | INFO | modules.bot:start_command:101 | Created new chat for user 770643374
+2026-01-13 19:35:30 | INFO | modules.bot:start_command:101 | Created new chat for user 402384748
+2026-01-13 19:55:42 | INFO | modules.bot:start_command:101 | Created new chat for user 6787940383
+2026-01-13 20:16:06 | INFO | modules.bot:start_command:101 | Created new chat for user 6636301647
+2026-01-13 20:58:44 | INFO | modules.bot:start_command:101 | Created new chat for user 7845074370
+2026-01-13 21:23:37 | INFO | modules.bot:start_command:101 | Created new chat for user 227810037
+2026-01-13 21:25:56 | INFO | modules.bot:request_manager:727 | Notification sent to staff 8035667634 for chat 25
+2026-01-13 22:22:25 | INFO | modules.bot:start_command:101 | Created new chat for user 1261443134
+2026-01-13 23:07:09 | INFO | modules.bot:start_command:101 | Created new chat for user 8328978497
+2026-01-13 23:08:43 | INFO | modules.bot:request_manager:727 | Notification sent to staff 8035667634 for chat 27
+2026-01-13 23:10:59 | INFO | modules.bot:request_manager:727 | Notification sent to staff 8035667634 for chat 27
+2026-01-13 23:12:35 | INFO | modules.bot:start_command:101 | Created new chat for user 8328978497
+2026-01-13 23:15:53 | INFO | modules.bot:start_command:101 | Created new chat for user 858032095
+2026-01-13 23:20:16 | INFO | modules.bot:start_command:101 | Created new chat for user 645983514
+2026-01-13 23:20:58 | INFO | modules.bot:start_command:101 | Created new chat for user 334969852
+2026-01-13 23:26:18 | INFO | modules.bot:start_command:101 | Created new chat for user 138337126
+2026-01-13 23:36:45 | INFO | modules.bot:start_command:101 | Created new chat for user 973083559
+2026-01-14 00:01:13 | INFO | modules.bot:start_command:101 | Created new chat for user 8124036833
+2026-01-14 04:03:06 | INFO | modules.bot:start_command:101 | Created new chat for user 1686879249
+2026-01-14 07:46:13 | INFO | modules.bot:start_command:101 | Created new chat for user 7176475525
+2026-01-14 08:07:35 | INFO | modules.bot:start_command:101 | Created new chat for user 7085078772

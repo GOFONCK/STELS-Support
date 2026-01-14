@@ -5,10 +5,10 @@
 
 import os
 import logging
-import requests
 import json
 import asyncpg
 import aiosqlite
+import httpx
 from typing import Optional, Dict, List
 from sqlalchemy import create_engine, text
 from modules.config import Config
@@ -25,6 +25,36 @@ class AISupport:
         self.api_type = config.ai_support_api_type
         self.api_key = config.ai_support_api_key
         self.project_databases = config.get_project_databases()
+        
+        # Поддержка нескольких API ключей
+        if config.ai_support_api_keys:
+            self.api_keys = [key.strip() for key in config.ai_support_api_keys.split(",") if key.strip()]
+            if self.api_key:
+                # Добавляем основной ключ в начало списка
+                if self.api_key not in self.api_keys:
+                    self.api_keys.insert(0, self.api_key)
+        else:
+            self.api_keys = [self.api_key] if self.api_key else []
+        
+        # Список моделей для использования (fallback)
+        if config.groq_models:
+            self.models = [m.strip() for m in config.groq_models.split(",") if m.strip()]
+        else:
+            # Модели по умолчанию (оптимизированы по лимитам)
+            # Порядок: сначала модели с лучшими лимитами, потом по качеству
+            self.models = [
+                "llama-3.1-8b-instant",  # 14.4K req/day, 500K tokens/day - лучшие дневные лимиты
+                "qwen/qwen3-32b",  # 60 req/min, 500K tokens/day - лучшие минутные лимиты
+                "moonshotai/kimi-k2-instruct",  # 60 req/min, 300K tokens/day
+                "meta-llama/llama-4-scout-17b-16e-instruct",  # 30K tokens/min, 500K tokens/day
+                "llama-3.3-70b-versatile",  # 12K tokens/min - мощная, но ограниченная
+                "openai/gpt-oss-120b",  # Альтернатива
+                "openai/gpt-oss-20b"  # Альтернатива
+            ]
+        
+        # Индекс текущего ключа и модели для round-robin
+        self.current_key_index = 0
+        self.current_model_index = 0
     
     async def get_ai_answer(
         self, 
@@ -63,59 +93,283 @@ class AISupport:
             logger.error(f"Ошибка при получении ответа от AI: {e}")
             return None
     
-    def _build_service_context(self, context: Optional[Dict] = None) -> str:
-        """Построить контекст о сервисе для AI"""
+    async def _build_service_context(self, context: Optional[Dict] = None) -> str:
+        """Построить контекст о сервисе для AI (с приоритетом БД)"""
         service_info = []
         
-        # Информация о проекте
+        # Базовая информация о проекте
         if self.config.project_name:
             service_info.append(f"Название проекта: {self.config.project_name}")
         if self.config.project_description:
             service_info.append(f"Описание: {self.config.project_description}")
         if self.config.project_website:
-            service_info.append(f"Сайт: {self.config.project_website}")
+            service_info.append(f"Официальный сайт: {self.config.project_website}")
         if self.config.project_bot_link:
-            service_info.append(f"Бот: {self.config.project_bot_link}")
+            service_info.append(f"Telegram бот: {self.config.project_bot_link}")
         if self.config.project_owner_contacts:
             service_info.append(f"Контакты владельца: {self.config.project_owner_contacts}")
         
+        # Пытаемся получить расширенную информацию из БД проектов (приоритет)
+        db_info = await self._get_service_info_from_db()
+        
+        # Особенности сервиса
+        if db_info.get("features"):
+            service_info.append(f"\nОсобенности сервиса:\n{db_info['features']}")
+        elif self.config.service_features:
+            service_info.append(f"\nОсобенности сервиса:\n{self.config.service_features}")
+        
+        # Тарифы и цены
+        if db_info.get("tariffs"):
+            service_info.append(f"\nТарифы и цены:\n{db_info['tariffs']}")
+        elif self.config.service_tariffs:
+            service_info.append(f"\nТарифы и цены:\n{self.config.service_tariffs}")
+        
+        # Инструкции
+        if db_info.get("instructions"):
+            service_info.append(f"\nИнструкции по использованию:\n{db_info['instructions']}")
+        elif self.config.service_instructions:
+            service_info.append(f"\nИнструкции по использованию:\n{self.config.service_instructions}")
+        
+        # FAQ
+        if db_info.get("faq"):
+            service_info.append(f"\nЧасто задаваемые вопросы (FAQ):\n{db_info['faq']}")
+        elif self.config.service_faq:
+            service_info.append(f"\nЧасто задаваемые вопросы (FAQ):\n{self.config.service_faq}")
+        
+        # Часы работы поддержки
+        if db_info.get("support_hours"):
+            service_info.append(f"\nЧасы работы поддержки: {db_info['support_hours']}")
+        elif self.config.service_support_hours:
+            service_info.append(f"\nЧасы работы поддержки: {self.config.service_support_hours}")
+        
+        # Информация о пользователе
         if context:
-            # Информация о пользователе
+            user_info = []
             if context.get("user_id"):
-                service_info.append(f"ID пользователя: {context.get('user_id')}")
+                user_info.append(f"ID пользователя: {context.get('user_id')}")
             if context.get("username"):
-                service_info.append(f"Username: {context.get('username')}")
+                user_info.append(f"Username: @{context.get('username')}")
+            if context.get("first_name"):
+                user_info.append(f"Имя: {context.get('first_name')}")
+            
+            if user_info:
+                service_info.append(f"\nИнформация о пользователе:\n" + "\n".join(user_info))
         
         return "\n".join(service_info) if service_info else ""
     
-    async def _get_project_data(self, query: str) -> Optional[str]:
+    async def _get_service_info_from_db(self) -> Dict[str, str]:
+        """Получить информацию о сервисе из БД проектов (приоритет над .env)"""
+        info = {}
+        
+        if not self.project_databases:
+            return info
+        
+        for db_url in self.project_databases:
+            try:
+                if db_url.startswith("postgresql://"):
+                    db_info = await self._query_service_info_postgres(db_url)
+                elif db_url.startswith("sqlite:///"):
+                    db_info = await self._query_service_info_sqlite(db_url)
+                else:
+                    continue
+                
+                # Объединяем информацию из всех БД (первая найденная имеет приоритет)
+                for key, value in db_info.items():
+                    if value and key not in info:
+                        info[key] = value
+            except Exception as e:
+                logger.debug(f"Не удалось получить информацию о сервисе из БД: {e}")
+                continue
+        
+        return info
+    
+    async def _query_service_info_postgres(self, db_url: str) -> Dict[str, str]:
+        """Получить информацию о сервисе из PostgreSQL"""
+        info = {}
+        
+        try:
+            parts = db_url.replace("postgresql://", "").split("@")
+            if len(parts) != 2:
+                return info
+            
+            user_pass = parts[0].split(":")
+            host_db = parts[1].split("/")
+            host_port = host_db[0].split(":")
+            
+            user = user_pass[0]
+            password = user_pass[1] if len(user_pass) > 1 else ""
+            host = host_port[0]
+            port = int(host_port[1]) if len(host_port) > 1 else 5432
+            database = host_db[1] if len(host_db) > 1 else ""
+            
+            conn = await asyncpg.connect(
+                host=host,
+                port=port,
+                user=user,
+                password=password,
+                database=database
+            )
+            
+            # Пытаемся получить информацию из таблицы settings, config или service_info
+            try:
+                # Проверяем таблицу service_info
+                result = await conn.fetchrow("""
+                    SELECT faq, tariffs, instructions, features, support_hours 
+                    FROM service_info 
+                    LIMIT 1
+                """)
+                if result:
+                    if result.get('faq'):
+                        info['faq'] = result['faq']
+                    if result.get('tariffs'):
+                        info['tariffs'] = result['tariffs']
+                    if result.get('instructions'):
+                        info['instructions'] = result['instructions']
+                    if result.get('features'):
+                        info['features'] = result['features']
+                    if result.get('support_hours'):
+                        info['support_hours'] = result['support_hours']
+            except:
+                pass
+            
+            # Если не нашли в service_info, пробуем получить тарифы из таблицы tariffs
+            if not info.get('tariffs'):
+                try:
+                    tariffs = await conn.fetch("""
+                        SELECT name, price, description 
+                        FROM tariffs 
+                        ORDER BY price ASC
+                        LIMIT 10
+                    """)
+                    if tariffs:
+                        tariff_list = []
+                        for t in tariffs:
+                            name = t.get('name', 'N/A')
+                            price = t.get('price', 'N/A')
+                            desc = t.get('description', '')
+                            tariff_str = f"- {name}: {price}"
+                            if desc:
+                                tariff_str += f" ({desc})"
+                            tariff_list.append(tariff_str)
+                        if tariff_list:
+                            info['tariffs'] = "\n".join(tariff_list)
+                except:
+                    pass
+            
+            await conn.close()
+        except Exception as e:
+            logger.debug(f"Ошибка получения информации о сервисе из PostgreSQL: {e}")
+        
+        return info
+    
+    async def _query_service_info_sqlite(self, db_url: str) -> Dict[str, str]:
+        """Получить информацию о сервисе из SQLite"""
+        info = {}
+        
+        try:
+            db_path = db_url.replace("sqlite:///", "")
+            
+            async with aiosqlite.connect(db_path) as db:
+                # Пытаемся получить информацию из таблицы service_info
+                try:
+                    cursor = await db.execute("""
+                        SELECT faq, tariffs, instructions, features, support_hours 
+                        FROM service_info 
+                        LIMIT 1
+                    """)
+                    result = await cursor.fetchone()
+                    
+                    if result:
+                        cursor = await db.execute("PRAGMA table_info(service_info)")
+                        columns = [row[1] for row in await cursor.fetchall()]
+                        
+                        if 'faq' in columns and result[columns.index('faq')]:
+                            info['faq'] = result[columns.index('faq')]
+                        if 'tariffs' in columns and result[columns.index('tariffs')]:
+                            info['tariffs'] = result[columns.index('tariffs')]
+                        if 'instructions' in columns and result[columns.index('instructions')]:
+                            info['instructions'] = result[columns.index('instructions')]
+                        if 'features' in columns and result[columns.index('features')]:
+                            info['features'] = result[columns.index('features')]
+                        if 'support_hours' in columns and result[columns.index('support_hours')]:
+                            info['support_hours'] = result[columns.index('support_hours')]
+                except:
+                    pass
+                
+                # Если не нашли в service_info, пробуем получить тарифы из таблицы tariffs
+                if not info.get('tariffs'):
+                    try:
+                        cursor = await db.execute("""
+                            SELECT name, price, description 
+                            FROM tariffs 
+                            ORDER BY price ASC
+                            LIMIT 10
+                        """)
+                        tariffs = await cursor.fetchall()
+                        
+                        if tariffs:
+                            cursor = await db.execute("PRAGMA table_info(tariffs)")
+                            columns = [row[1] for row in await cursor.fetchall()]
+                            
+                            tariff_list = []
+                            for t in tariffs:
+                                name_idx = columns.index('name') if 'name' in columns else 0
+                                price_idx = columns.index('price') if 'price' in columns else 1
+                                desc_idx = columns.index('description') if 'description' in columns else None
+                                
+                                name = t[name_idx]
+                                price = t[price_idx]
+                                desc = t[desc_idx] if desc_idx is not None and desc_idx < len(t) else ''
+                                
+                                tariff_str = f"- {name}: {price}"
+                                if desc:
+                                    tariff_str += f" ({desc})"
+                                tariff_list.append(tariff_str)
+                            
+                            if tariff_list:
+                                info['tariffs'] = "\n".join(tariff_list)
+                    except:
+                        pass
+                
+                await db.commit()
+        except Exception as e:
+            logger.debug(f"Ошибка получения информации о сервисе из SQLite: {e}")
+        
+        return info
+    
+    async def _get_project_data(self, query: str, user_id: int = None) -> Optional[str]:
         """Получить данные из баз данных проектов"""
         if not self.project_databases:
             return None
         
         results = []
+        question_lower = query.lower()
+        
         for db_url in self.project_databases:
             try:
                 if db_url.startswith("postgresql://"):
-                    data = await self._query_postgres(db_url, query)
+                    data = await self._query_postgres_enhanced(db_url, question_lower, user_id)
                 elif db_url.startswith("sqlite:///"):
-                    data = await self._query_sqlite(db_url, query)
+                    data = await self._query_sqlite_enhanced(db_url, question_lower, user_id)
                 else:
                     continue
                 
                 if data:
-                    results.append(f"Данные из БД: {json.dumps(data, ensure_ascii=False)}")
+                    results.append(data)
             except Exception as e:
                 logger.error(f"Ошибка запроса к БД проекта: {e}")
                 continue
         
-        return "\n".join(results) if results else None
+        return "\n\n---\n\n".join(results) if results else None
     
     async def _query_postgres(self, db_url: str, query: str) -> Optional[Dict]:
-        """Выполнить запрос к PostgreSQL"""
+        """Выполнить запрос к PostgreSQL (legacy метод)"""
+        return await self._query_postgres_enhanced(db_url, query.lower(), None)
+    
+    async def _query_postgres_enhanced(self, db_url: str, question: str, user_id: int = None) -> Optional[str]:
+        """Улучшенный запрос к PostgreSQL с пониманием контекста"""
         try:
             # Парсим URL
-            # postgresql://user:pass@host:port/dbname
             parts = db_url.replace("postgresql://", "").split("@")
             if len(parts) != 2:
                 return None
@@ -138,35 +392,119 @@ class AISupport:
                 database=database
             )
             
-            # Простой запрос для получения информации о пользователях (пример)
-            # В реальности здесь должен быть более умный анализ запроса пользователя
-            rows = await conn.fetch("SELECT COUNT(*) as count FROM users LIMIT 1")
+            data_parts = []
+            
+            # Если есть user_id, пытаемся найти информацию о пользователе
+            if user_id:
+                try:
+                    # Пытаемся найти пользователя по telegram_id или user_id
+                    user_info = await conn.fetchrow("""
+                        SELECT * FROM users 
+                        WHERE telegram_id = $1 OR id = $1 
+                        LIMIT 1
+                    """, user_id)
+                    
+                    if user_info:
+                        info = []
+                        if 'username' in user_info:
+                            info.append(f"Username: {user_info['username']}")
+                        if 'balance' in user_info:
+                            info.append(f"Баланс: {user_info['balance']}")
+                        if 'subscription_expires_at' in user_info:
+                            info.append(f"Подписка до: {user_info['subscription_expires_at']}")
+                        if info:
+                            data_parts.append("Информация о пользователе:\n" + "\n".join(info))
+                except Exception as e:
+                    logger.debug(f"Не удалось получить данные пользователя: {e}")
+            
+            # Если вопрос о тарифах
+            if any(kw in question for kw in ["тариф", "цена", "стоимость", "tariff", "price"]):
+                try:
+                    tariffs = await conn.fetch("SELECT * FROM tariffs LIMIT 10")
+                    if tariffs:
+                        tariff_info = []
+                        for t in tariffs:
+                            name = t.get('name', 'N/A')
+                            price = t.get('price', 'N/A')
+                            tariff_info.append(f"- {name}: {price}")
+                        if tariff_info:
+                            data_parts.append("Доступные тарифы:\n" + "\n".join(tariff_info))
+                except Exception as e:
+                    logger.debug(f"Не удалось получить тарифы: {e}")
+            
             await conn.close()
             
-            if rows:
-                return {"count": rows[0]["count"]}
+            return "\n\n".join(data_parts) if data_parts else None
+            
         except Exception as e:
             logger.error(f"Ошибка запроса к PostgreSQL: {e}")
-        
-        return None
+            return None
     
     async def _query_sqlite(self, db_url: str, query: str) -> Optional[Dict]:
-        """Выполнить запрос к SQLite"""
+        """Выполнить запрос к SQLite (legacy метод)"""
+        result = await self._query_sqlite_enhanced(db_url, query.lower(), None)
+        if result:
+            return {"data": result}
+        return None
+    
+    async def _query_sqlite_enhanced(self, db_url: str, question: str, user_id: int = None) -> Optional[str]:
+        """Улучшенный запрос к SQLite с пониманием контекста"""
         try:
-            # sqlite:///path/to/database.db
             db_path = db_url.replace("sqlite:///", "")
             
             async with aiosqlite.connect(db_path) as db:
-                cursor = await db.execute("SELECT COUNT(*) as count FROM users LIMIT 1")
-                row = await cursor.fetchone()
+                data_parts = []
+                
+                # Если есть user_id, пытаемся найти информацию о пользователе
+                if user_id:
+                    try:
+                        cursor = await db.execute("""
+                            SELECT * FROM users 
+                            WHERE telegram_id = ? OR id = ? 
+                            LIMIT 1
+                        """, (user_id, user_id))
+                        user_info = await cursor.fetchone()
+                        
+                        if user_info:
+                            # Получаем названия колонок
+                            cursor = await db.execute("PRAGMA table_info(users)")
+                            columns = [row[1] for row in await cursor.fetchall()]
+                            
+                            info = []
+                            for i, col in enumerate(columns):
+                                if col in ['username', 'balance', 'subscription_expires_at']:
+                                    info.append(f"{col}: {user_info[i]}")
+                            if info:
+                                data_parts.append("Информация о пользователе:\n" + "\n".join(info))
+                    except Exception as e:
+                        logger.debug(f"Не удалось получить данные пользователя: {e}")
+                
+                # Если вопрос о тарифах
+                if any(kw in question for kw in ["тариф", "цена", "стоимость"]):
+                    try:
+                        cursor = await db.execute("SELECT * FROM tariffs LIMIT 10")
+                        tariffs = await cursor.fetchall()
+                        if tariffs:
+                            cursor = await db.execute("PRAGMA table_info(tariffs)")
+                            columns = [row[1] for row in await cursor.fetchall()]
+                            
+                            tariff_info = []
+                            for t in tariffs:
+                                name_idx = columns.index('name') if 'name' in columns else 0
+                                price_idx = columns.index('price') if 'price' in columns else 1
+                                tariff_info.append(f"- {t[name_idx]}: {t[price_idx]}")
+                            if tariff_info:
+                                data_parts.append("Доступные тарифы:\n" + "\n".join(tariff_info))
+                    except Exception as e:
+                        logger.debug(f"Не удалось получить тарифы: {e}")
+                
                 await db.commit()
                 
-                if row:
-                    return {"count": row[0]}
+                return "\n\n".join(data_parts) if data_parts else None
+                
         except Exception as e:
             logger.error(f"Ошибка запроса к SQLite: {e}")
-        
-        return None
+            return None
     
     async def _get_groq_answer(
         self, 
@@ -174,36 +512,118 @@ class AISupport:
         context: Optional[Dict] = None, 
         chat_history: Optional[List[Dict]] = None
     ) -> Optional[str]:
-        """Получить ответ от Groq API"""
+        """Получить ответ от Groq API с fallback на другие модели и ключи"""
+        
+        # Пробуем все комбинации ключей и моделей
+        last_error = None
+        
+        for key_index, api_key in enumerate(self.api_keys):
+            if not api_key:
+                continue
+                
+            for model_index, model in enumerate(self.models):
+                try:
+                    result = await self._try_groq_request(
+                        api_key=api_key,
+                        model=model,
+                        question=question,
+                        context=context,
+                        chat_history=chat_history
+                    )
+                    
+                    if result:
+                        # Сохраняем успешную комбинацию для следующего запроса
+                        self.current_key_index = key_index
+                        self.current_model_index = model_index
+                        logger.info(f"Successfully used model: {model} with key index: {key_index}")
+                        return result
+                        
+                except Exception as e:
+                    error_msg = str(e).lower()
+                    # Проверяем, является ли это ошибкой токенов/лимита
+                    if any(keyword in error_msg for keyword in ["rate limit", "quota", "token", "limit exceeded", "429"]):
+                        logger.warning(f"Rate limit/quota exceeded for model {model} with key {key_index}, trying next...")
+                        last_error = e
+                        continue
+                    else:
+                        # Другие ошибки - логируем и пробуем дальше
+                        logger.debug(f"Error with model {model} (key {key_index}): {e}")
+                        last_error = e
+                        continue
+        
+        # Если все попытки не удались
+        if last_error:
+            logger.error(f"All Groq API attempts failed. Last error: {last_error}")
+        else:
+            logger.error("All Groq API attempts failed. No API keys or models available.")
+        
+        return None
+    
+    async def _try_groq_request(
+        self,
+        api_key: str,
+        model: str,
+        question: str,
+        context: Optional[Dict] = None,
+        chat_history: Optional[List[Dict]] = None
+    ) -> Optional[str]:
+        """Попытка одного запроса к Groq API"""
         try:
             url = "https://api.groq.com/openai/v1/chat/completions"
             
             headers = {
-                "Authorization": f"Bearer {self.api_key}",
+                "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json"
             }
             
+            # Получаем контекст о сервисе (async)
+            service_context = await self._build_service_context(context)
+            
             # Формируем системный промпт с информацией о сервисе
             project_name = self.config.project_name or 'STELS-Support'
-            system_prompt = f"""Ты помощник поддержки VPN проекта {project_name}. 
-Отвечай на вопросы пользователей вежливо, профессионально и по делу.
-Используй информацию о проекте для точных ответов.
-Отвечай на русском языке, если вопрос на русском.
-Будь дружелюбным и готовым помочь.
+            system_prompt = f"""Ты профессиональный помощник службы поддержки VPN проекта {project_name}.
 
-ВАЖНО: Не называй пользователя другими именами или проектами. Обращайся к нему по имени, которое он указал, или просто "вы".
+ТВОЯ РОЛЬ:
+- Помогать пользователям решать их вопросы о VPN сервисе
+- Предоставлять точную информацию на основе данных о сервисе
+- Быть вежливым, дружелюбным и профессиональным
+- Если не можешь решить вопрос - предложить пригласить менеджера
 
-Если вопрос пользователя не может быть решен тобой, предложи пригласить менеджера в чат.
+ПРАВИЛА ОБЩЕНИЯ:
+- Отвечай на русском языке, если вопрос на русском
+- Используй информацию о сервисе для точных ответов
+- НЕ называй пользователя другими именами или проектами
+- Обращайся к пользователю по имени (если известно) или на "вы"
+- Будь конкретным и полезным в ответах
+- Если вопрос неясен - уточни детали
 
-Информация о проекте:
-{self._build_service_context(context)}"""
+СТРУКТУРА ОТВЕТОВ:
+- Начни с приветствия или подтверждения понимания вопроса
+- Дай четкий и структурированный ответ
+- Если нужно - используй нумерованные списки или пункты
+- В конце предложи дополнительную помощь или пригласи менеджера, если вопрос сложный
+
+ИНФОРМАЦИЯ О СЕРВИСЕ:
+{service_context}
+
+ВАЖНО: Если вопрос пользователя касается личных данных (баланс, подписка, тариф), но у тебя нет доступа к этой информации - предложи пользователю проверить личный кабинет или пригласить менеджера."""
             
             # Пытаемся получить данные из БД проектов, если вопрос связан с данными
             project_data = None
-            if any(keyword in question.lower() for keyword in ["пользователь", "подписка", "тариф", "баланс"]):
-                project_data = await self._get_project_data(question)
+            user_id = context.get("user_id") if context else None
+            question_lower = question.lower()
+            
+            # Расширенный список ключевых слов для запросов к БД
+            db_keywords = [
+                "пользователь", "подписка", "тариф", "баланс", "аккаунт", "профиль",
+                "цена", "стоимость", "оплата", "платеж", "subscription", "tariff",
+                "balance", "account", "profile", "price", "payment"
+            ]
+            
+            if any(keyword in question_lower for keyword in db_keywords):
+                project_data = await self._get_project_data(question, user_id)
                 if project_data:
-                    system_prompt += f"\n\nДополнительная информация из баз данных проектов:\n{project_data}"
+                    system_prompt += f"\n\nВАЖНО - Дополнительная информация из баз данных проектов:\n{project_data}\n\nИспользуй эту информацию для точных ответов о пользователе, тарифах и подписках."
             
             # Формируем список сообщений с историей
             messages = [{"role": "system", "content": system_prompt}]
@@ -220,31 +640,37 @@ class AISupport:
             messages.append({"role": "user", "content": question})
             
             payload = {
-                "model": "llama-3.1-8b-instant",
+                "model": model,  # Используем переданную модель
                 "messages": messages,
                 "temperature": 0.7,
                 "max_tokens": 1000
             }
             
-            response = requests.post(url, json=payload, headers=headers, timeout=30)
-            
-            if response.status_code != 200:
-                error_text = response.text
-                logger.error(f"Ошибка Groq API (status {response.status_code}): {error_text}")
-                return None
-            
-            response.raise_for_status()
-            data = response.json()
-            answer = data.get("choices", [{}])[0].get("message", {}).get("content", "")
-            
-            return answer.strip() if answer else None
-            
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Ошибка запроса к Groq API: {e}")
-            return None
+            async with httpx.AsyncClient() as client:
+                response = await client.post(url, headers=headers, json=payload, timeout=30.0)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if "choices" in data and len(data["choices"]) > 0:
+                        return data["choices"][0]["message"]["content"]
+                elif response.status_code == 429:
+                    # Rate limit - пробрасываем для fallback
+                    raise Exception(f"Rate limit exceeded: {response.text}")
+                elif response.status_code == 401:
+                    # Неверный ключ - пробрасываем для fallback
+                    raise Exception(f"Invalid API key: {response.text}")
+                else:
+                    error_msg = f"Groq API error: {response.status_code} - {response.text}"
+                    logger.warning(error_msg)
+                    raise Exception(error_msg)
+                    
+        except httpx.TimeoutException:
+            raise Exception("Request timeout")
+        except httpx.RequestError as e:
+            raise Exception(f"Request error: {str(e)}")
         except Exception as e:
-            logger.error(f"Ошибка обработки ответа от Groq API: {e}")
-            return None
+            # Пробрасываем дальше для fallback
+            raise
     
     def _get_rule_based_answer(
         self, 

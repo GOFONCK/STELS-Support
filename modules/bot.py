@@ -4,6 +4,7 @@
 
 import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.error import BadRequest
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -178,6 +179,119 @@ class SupportBot:
         
         await update.message.reply_text(message_text, reply_markup=reply_markup)
     
+    async def show_admin_menu(self, query):
+        """Показать главное меню админа"""
+        keyboard = [
+            [InlineKeyboardButton("📋 Все чаты", callback_data="admin_chats")],
+            [InlineKeyboardButton("🟡 Ожидают менеджера", callback_data="admin_waiting")],
+            [InlineKeyboardButton("🟢 Активные чаты", callback_data="admin_active")],
+            [InlineKeyboardButton("❓ Помощь", callback_data="admin_help")],
+            # Постоянные кнопки внизу
+            [
+                InlineKeyboardButton("🔄 Обновить", callback_data="admin_back"),
+                InlineKeyboardButton("📋 Все чаты", callback_data="admin_chats")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        try:
+            await query.edit_message_text(
+                "👋 Панель управления поддержкой\n\nВыберите действие:",
+                reply_markup=reply_markup
+            )
+        except BadRequest as e:
+            if "not modified" in str(e).lower():
+                pass  # Сообщение не изменилось
+            else:
+                raise
+    
+    async def show_all_chats(self, query, user_id: int):
+        """Показать все чаты через callback"""
+        chats = await self.db.get_all_chats()
+        await self._display_chats_list(query, chats, "Все чаты")
+    
+    async def show_chats_by_status(self, query, user_id: int, status: str):
+        """Показать чаты по статусу"""
+        chats = await self.db.get_all_chats(status=status)
+        status_name = {
+            "active": "Активные",
+            "waiting_manager": "Ожидают менеджера",
+            "closed": "Закрытые"
+        }.get(status, status)
+        await self._display_chats_list(query, chats, f"Чаты: {status_name}")
+    
+    async def _display_chats_list(self, query, chats, title: str):
+        """Отобразить список чатов"""
+        if not chats:
+            keyboard = [[InlineKeyboardButton("◀️ Назад", callback_data="admin_back")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            try:
+                await query.edit_message_text(
+                    f"📭 Нет чатов для отображения.",
+                    reply_markup=reply_markup
+                )
+            except BadRequest:
+                pass  # Сообщение не изменилось
+            return
+        
+        message_text = f"📋 {title} ({len(chats)}):\n\n"
+        keyboard_buttons = []
+        
+        for chat in chats[:15]:  # Показываем первые 15
+            status_emoji = {
+                "active": "🟢",
+                "waiting_manager": "🟡",
+                "closed": "🔴"
+            }.get(chat.status, "⚪")
+            
+            user_info = f"@{chat.username}" if chat.username else f"ID: {chat.user_id}"
+            name = chat.first_name or "Пользователь"
+            message_text += (
+                f"{status_emoji} Чат #{chat.id} - {name} ({user_info})\n"
+                f"   Создан: {chat.created_at.strftime('%d.%m %H:%M')}\n\n"
+            )
+            
+            keyboard_buttons.append([
+                InlineKeyboardButton(
+                    f"{status_emoji} Чат #{chat.id} - {name}",
+                    callback_data=f"view_chat_{chat.id}"
+                )
+            ])
+        
+        # Добавляем кнопку "Назад"
+        keyboard_buttons.append([InlineKeyboardButton("◀️ Назад", callback_data="admin_back")])
+        reply_markup = InlineKeyboardMarkup(keyboard_buttons)
+        
+        try:
+            await query.edit_message_text(message_text, reply_markup=reply_markup)
+        except BadRequest as e:
+            if "not modified" in str(e).lower():
+                pass  # Сообщение не изменилось, это нормально
+            else:
+                raise
+    
+    async def show_admin_help(self, query):
+        """Показать справку для админа"""
+        keyboard = [[InlineKeyboardButton("◀️ Назад", callback_data="admin_back")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        help_text = (
+            "📋 Команды для администраторов:\n\n"
+            "• /start - Главное меню\n"
+            "• /chats - Просмотр всех чатов\n"
+            "• /close <chat_id> - Закрыть чат\n"
+            "• /help - Эта справка\n\n"
+            "💡 Используйте кнопки для быстрого доступа к функциям."
+        )
+        
+        try:
+            await query.edit_message_text(help_text, reply_markup=reply_markup)
+        except BadRequest as e:
+            if "not modified" in str(e).lower():
+                pass  # Сообщение не изменилось
+            else:
+                raise
+    
     async def close_chat_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработчик команды /close"""
         user_id = update.effective_user.id
@@ -200,15 +314,44 @@ class SupportBot:
         """Закрыть чат из кнопки"""
         try:
             await self._close_chat(chat_id, user_id)
-            keyboard = [[InlineKeyboardButton("◀️ Назад к списку", callback_data="admin_chats")]]
+            
+            # Кнопки управления после закрытия
+            keyboard = [
+                [
+                    InlineKeyboardButton("📋 Все чаты", callback_data="admin_chats"),
+                    InlineKeyboardButton("🔄 Обновить", callback_data=f"view_chat_{chat_id}")
+                ],
+                [
+                    InlineKeyboardButton("◀️ Назад", callback_data="admin_chats")
+                ]
+            ]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await query.edit_message_text(
-                f"✅ Чат #{chat_id} закрыт.",
-                reply_markup=reply_markup
-            )
+            
+            try:
+                await query.edit_message_text(
+                    f"✅ Чат #{chat_id} закрыт.\n\n"
+                    f"Пользователь получил уведомление о закрытии чата.",
+                    reply_markup=reply_markup
+                )
+            except BadRequest:
+                await query.answer("✅ Чат закрыт", show_alert=True)
         except Exception as e:
             logger.error(f"Error closing chat from button: {e}")
-            await query.edit_message_text(f"❌ Ошибка при закрытии чата: {str(e)}")
+            
+            # Кнопки даже при ошибке
+            keyboard = [
+                [InlineKeyboardButton("◀️ Назад к списку", callback_data="admin_chats")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            try:
+                await query.edit_message_text(
+                    f"❌ Ошибка при закрытии чата: {str(e)}\n\n"
+                    f"Попробуйте еще раз или используйте команду /close {chat_id}",
+                    reply_markup=reply_markup
+                )
+            except:
+                await query.answer(f"❌ Ошибка: {str(e)}", show_alert=True)
     
     async def close_chat_from_message(self, message, chat_id: int, user_id: int):
         """Закрыть чат из сообщения"""
@@ -244,6 +387,29 @@ class SupportBot:
         
         user_id = query.from_user.id
         data = query.data
+        
+        # Обработка действий пользователей
+        if data == "user_faq":
+            await self.show_user_faq(query)
+            return
+        elif data == "user_instructions":
+            await self.show_user_instructions(query)
+            return
+        elif data == "user_ask":
+            keyboard = [[InlineKeyboardButton("◀️ Назад", callback_data="user_back")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            try:
+                await query.edit_message_text(
+                    "💬 Напишите ваш вопрос, и я постараюсь помочь!\n\n"
+                    "Просто отправьте сообщение с вашим вопросом.",
+                    reply_markup=reply_markup
+                )
+            except BadRequest:
+                pass
+            return
+        elif data == "user_back":
+            await self.show_user_back(query)
+            return
         
         # request_manager доступен всем пользователям
         if data.startswith("request_manager_"):
@@ -310,31 +476,49 @@ class SupportBot:
             
             message_text += f"{role_emoji} {msg.content[:100]}\n\n"
         
-        # Кнопки управления чатом
+        # Кнопки управления чатом (всегда внизу)
         keyboard_buttons = []
         
+        # Основные действия с чатом
+        action_buttons = []
         if chat.status != "closed":
             if chat.status != "waiting_manager" or chat.manager_id is None:
-                keyboard_buttons.append([
-                    InlineKeyboardButton("👨‍💼 Присоединиться к чату", callback_data=f"join_chat_{chat_id}")
-                ])
+                action_buttons.append(
+                    InlineKeyboardButton("👨‍💼 Присоединиться", callback_data=f"join_chat_{chat_id}")
+                )
             else:
-                keyboard_buttons.append([
+                action_buttons.append(
                     InlineKeyboardButton("💬 Открыть чат", callback_data=f"join_chat_{chat_id}")
-                ])
+                )
+            
+            action_buttons.append(
+                InlineKeyboardButton("🔴 Закрыть", callback_data=f"close_chat_{chat_id}")
+            )
         
-        if chat.status != "closed":
-            keyboard_buttons.append([
-                InlineKeyboardButton("🔴 Закрыть чат", callback_data=f"close_chat_{chat_id}")
-            ])
+        if action_buttons:
+            keyboard_buttons.append(action_buttons)
         
+        # Кнопка обновления информации о чате
         keyboard_buttons.append([
-            InlineKeyboardButton("◀️ Назад к списку", callback_data="admin_chats")
+            InlineKeyboardButton("🔄 Обновить", callback_data=f"view_chat_{chat_id}")
         ])
+        
+        # Навигационные кнопки (всегда внизу)
+        nav_buttons = [
+            InlineKeyboardButton("◀️ Назад", callback_data="admin_chats"),
+            InlineKeyboardButton("📋 Все чаты", callback_data="admin_chats")
+        ]
+        keyboard_buttons.append(nav_buttons)
         
         reply_markup = InlineKeyboardMarkup(keyboard_buttons)
         
-        await query.edit_message_text(message_text, reply_markup=reply_markup)
+        try:
+            await query.edit_message_text(message_text, reply_markup=reply_markup)
+        except BadRequest as e:
+            if "not modified" in str(e).lower():
+                pass  # Сообщение не изменилось
+            else:
+                raise
     
     async def join_chat(self, query, chat_id: int, manager_id: int):
         """Присоединиться к чату"""
@@ -449,7 +633,8 @@ class SupportBot:
         context = {
             "user_id": user_id,
             "username": user.username,
-            "first_name": user.first_name
+            "first_name": user.first_name,
+            "last_name": user.last_name
         }
         
         ai_response = await self.ai.get_ai_answer(message_text, context, chat_history)
@@ -555,3 +740,75 @@ class SupportBot:
                 )
         except Exception as e:
             logger.error(f"Error editing message: {e}")
+    
+    async def show_user_faq(self, query):
+        """Показать FAQ для пользователя"""
+        keyboard = [
+            [InlineKeyboardButton("◀️ Назад", callback_data="user_back")],
+            [InlineKeyboardButton("💬 Задать вопрос", callback_data="user_ask")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        if self.config.service_faq:
+            faq_text = f"❓ Часто задаваемые вопросы:\n\n{self.config.service_faq}"
+        else:
+            faq_text = (
+                "❓ Часто задаваемые вопросы:\n\n"
+                "• Как подключиться к VPN?\n"
+                "  Используйте subscription URL в настройках VPN клиента\n\n"
+                "• Как оплатить подписку?\n"
+                "  Оплата доступна в личном кабинете\n\n"
+                "• Какие устройства поддерживаются?\n"
+                "  Поддержка всех популярных платформ\n\n"
+                "Если ваш вопрос не найден, напишите его мне!"
+            )
+        
+        try:
+            await query.edit_message_text(faq_text, reply_markup=reply_markup)
+        except BadRequest:
+            await query.answer("FAQ", show_alert=False)
+    
+    async def show_user_instructions(self, query):
+        """Показать инструкции для пользователя"""
+        keyboard = [
+            [InlineKeyboardButton("◀️ Назад", callback_data="user_back")],
+            [InlineKeyboardButton("💬 Задать вопрос", callback_data="user_ask")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        if self.config.service_instructions:
+            instructions_text = f"📖 Инструкции по использованию:\n\n{self.config.service_instructions}"
+        else:
+            instructions_text = (
+                "📖 Инструкции по использованию:\n\n"
+                "1. Скачайте VPN клиент для вашего устройства\n"
+                "2. Получите subscription URL в личном кабинете\n"
+                "3. Добавьте subscription URL в настройки VPN клиента\n"
+                "4. Подключитесь к серверу\n\n"
+                "Если нужна помощь - напишите мне!"
+            )
+        
+        try:
+            await query.edit_message_text(instructions_text, reply_markup=reply_markup)
+        except BadRequest:
+            await query.answer("Инструкции", show_alert=False)
+    
+    async def show_user_back(self, query):
+        """Вернуться в главное меню пользователя"""
+        keyboard = [
+            [InlineKeyboardButton("❓ Частые вопросы", callback_data="user_faq")],
+            [InlineKeyboardButton("📖 Инструкции", callback_data="user_instructions")],
+            [InlineKeyboardButton("💬 Задать вопрос", callback_data="user_ask")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        welcome_text = (
+            f"👋 Добро пожаловать!\n\n"
+            f"Я бот поддержки проекта {self.config.project_name or 'STELS-Support'}.\n"
+            "Выберите действие или просто напишите ваш вопрос:"
+        )
+        
+        try:
+            await query.edit_message_text(welcome_text, reply_markup=reply_markup)
+        except BadRequest:
+            pass

@@ -18,10 +18,35 @@ class Config(BaseSettings):
     project_bot_link: str = Field(default="", alias="PROJECT_BOT_LINK")
     project_owner_contacts: str = Field(default="", alias="PROJECT_OWNER_CONTACTS")
     
+    # Extended service info (for AI context)
+    service_faq: str = Field(default="", alias="SERVICE_FAQ")  # Часто задаваемые вопросы
+    service_tariffs: str = Field(default="", alias="SERVICE_TARIFS")  # Информация о тарифах
+    service_instructions: str = Field(default="", alias="SERVICE_INSTRUCTIONS")  # Инструкции по использованию
+    service_features: str = Field(default="", alias="SERVICE_FEATURES")  # Особенности сервиса
+    service_support_hours: str = Field(default="Круглосуточно", alias="SERVICE_SUPPORT_HOURS")  # Часы работы поддержки
+    
     # AI Configuration
     ai_support_enabled: bool = Field(default=True, alias="AI_SUPPORT_ENABLED")
     ai_support_api_type: str = Field(default="groq", alias="AI_SUPPORT_API_TYPE")
     ai_support_api_key: str = Field(default="", alias="AI_SUPPORT_API_KEY")
+    
+    # Multiple Groq API keys for fallback (comma-separated)
+    ai_support_api_keys: Optional[str] = Field(default=None, alias="AI_SUPPORT_API_KEYS")
+    
+    # Groq models to use (comma-separated, will try in order)
+    # Models ordered by limits: best limits first, then by quality
+    # Current limits (2025):
+    # - llama-3.1-8b-instant: 30 req/min, 14.4K req/day, 6K tokens/min, 500K tokens/day (best daily limits)
+    # - qwen/qwen3-32b: 60 req/min, 1K req/day, 6K tokens/min, 500K tokens/day (best per-minute limits)
+    # - moonshotai/kimi-k2-instruct: 60 req/min, 1K req/day, 10K tokens/min, 300K tokens/day
+    # - meta-llama/llama-4-scout-17b-16e-instruct: 30 req/min, 1K req/day, 30K tokens/min, 500K tokens/day
+    # - llama-3.3-70b-versatile: 30 req/min, 1K req/day, 12K tokens/min, 100K tokens/day (powerful but limited)
+    # - groq/compound, groq/compound-mini: 70K tokens/min, No limit tokens/day (high throughput)
+    # - openai/gpt-oss-120b, openai/gpt-oss-20b: 30 req/min, 1K req/day, 8K tokens/min, 200K tokens/day
+    groq_models: str = Field(
+        default="llama-3.1-8b-instant,qwen/qwen3-32b,moonshotai/kimi-k2-instruct,meta-llama/llama-4-scout-17b-16e-instruct,llama-3.3-70b-versatile,openai/gpt-oss-120b,openai/gpt-oss-20b",
+        alias="GROQ_MODELS"
+    )
     
     # Database
     database_url: str = Field(
